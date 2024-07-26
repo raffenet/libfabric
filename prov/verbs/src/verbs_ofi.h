@@ -39,7 +39,20 @@
 
 #include "config.h"
 
+#include <limits.h>
+#ifndef LONG_WIDTH
+#ifdef LONG_BIT
+#define LONG_WIDTH LONG_BIT
+#elif defined(HAVE_ASM_TYPES_H)
 #include <asm/types.h>
+#define LONG_WIDTH __BITS_PER_LONG
+#else
+#if defined(__x86_64__) && !defined(__ILP32__)
+#define __BITS_PER_LONG 64
+#else
+#define __BITS_PER_LONG 32
+#endif
+#endif
 #include <errno.h>
 #include <fcntl.h>
 #include <arpa/inet.h>
