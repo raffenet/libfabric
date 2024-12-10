@@ -749,10 +749,14 @@ AS_IF([test x"$with_cuda" != x"no"],
 				 [cuda_runtime.h],
 				 [cudart],
 				 [cudaMemcpy],
-				 [-lcuda -lnvidia-ml],
+				 [-lcuda],
 				 [$with_cuda],
 				 [],
 				 [have_cuda=1])
+                AC_CHECK_LIB([nvidia-ml],
+                             [nvmlInit_v2],
+                             [],
+                             [have_cuda=0])
 	      ])
 
 	have_cuda_dmabuf=1
