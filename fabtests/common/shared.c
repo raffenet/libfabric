@@ -761,6 +761,27 @@ int ft_open_domain_res(void)
 	return 0;
 }
 
+/*
+ * Determine whether an event queue is required for the current test
+ * configuration.  Per the libfabric specification (fi_endpoint.3), EQs are
+ * only mandatory for connection-management (FI_EP_MSG / passive EPs),
+ * multicast/collective join completion, and async error reporting when the
+ * user has explicitly opted-in via FT_OPT_DOMAIN_EQ (-Q).  Connectionless
+ * RDM/DGRAM tests do not consume the EQ, so opening one is unnecessary and
+ * prevents fabtests from running against providers that do not implement
+ * fi_eq_open (e.g., OPX).
+ */
+static bool ft_need_eq(void)
+{
+	if (opts.options & FT_OPT_DOMAIN_EQ)
+		return true;
+	if (fi && fi->ep_attr && fi->ep_attr->type == FI_EP_MSG)
+		return true;
+	if (fi && (fi->caps & (FI_MULTICAST | FI_COLLECTIVE)))
+		return true;
+	return false;
+}
+
 int ft_open_fabric_res(void)
 {
 	int ret;
@@ -771,10 +792,12 @@ int ft_open_fabric_res(void)
 		return ret;
 	}
 
-	ret = fi_eq_open(fabric, &eq_attr, &eq, NULL);
-	if (ret) {
-		FT_PRINTERR("fi_eq_open", ret);
-		return ret;
+	if (ft_need_eq()) {
+		ret = fi_eq_open(fabric, &eq_attr, &eq, NULL);
+		if (ret) {
+			FT_PRINTERR("fi_eq_open", ret);
+			return ret;
+		}
 	}
 
 	return ft_open_domain_res();
