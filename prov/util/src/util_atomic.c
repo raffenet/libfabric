@@ -237,8 +237,8 @@ size_t ofi_datatype_size(enum fi_datatype datatype)
 		(void *dst, const void *src, size_t cnt)		\
 	{								\
 		size_t i;						\
-		type *d = (dst);					\
-		const type *s = (src);					\
+		type *restrict d = (dst);				\
+		const type *restrict s = (src);				\
 		type temp_s;						\
 		for (i = 0; i < cnt; i++) {				\
 			temp_s = s[i];					\
@@ -252,8 +252,8 @@ size_t ofi_datatype_size(enum fi_datatype datatype)
 		(void *dst, const void *src, size_t cnt)		\
 	{								\
 		size_t i;						\
-		ofi_complex_##type *d = (dst);				\
-		const ofi_complex_##type *s = (src);			\
+		ofi_complex_##type *restrict d = (dst);			\
+		const ofi_complex_##type *restrict s = (src);		\
 		ofi_complex_##type temp_s;				\
 		for (i = 0; i < cnt; i++) {				\
 			temp_s = s[i];					\
@@ -381,8 +381,8 @@ size_t ofi_datatype_size(enum fi_datatype datatype)
 		(void *dst, const void *src, void *res, size_t cnt)	\
 	{								\
 		size_t i;						\
-		type *d = (dst);					\
-		type *r = (res);					\
+		const type *restrict d = (dst);				\
+		type *restrict r = (res);				\
 		OFI_UNUSED(src);					\
 		for (i = 0; i < cnt; i++)				\
 			r[i] = op(type, d[i], r[i]);			\
@@ -393,11 +393,11 @@ size_t ofi_datatype_size(enum fi_datatype datatype)
 		(void *dst, const void *src, void *res, size_t cnt)	\
 	{								\
 		size_t i;						\
-		ofi_complex_##type *d = (dst);				\
-		ofi_complex_##type *r = (res);				\
+		const ofi_complex_##type *restrict d = (dst);		\
+		ofi_complex_##type *restrict r = (res);			\
 		OFI_UNUSED(src);					\
 		for (i = 0; i < cnt; i++)				\
-			r[i] = op(type, d[i], s[i]);			\
+			r[i] = op(type, d[i], r[i]);			\
 	}
 
 #endif /* HAVE_BUILTIN_MM_ATOMICS */
@@ -563,9 +563,9 @@ size_t ofi_datatype_size(enum fi_datatype datatype)
 		(void *dst, const void *src, void *res, size_t cnt)	\
 	{								\
 		size_t i;						\
-		type *d = dst;						\
-		const type *s = src;					\
-		type *r = res;						\
+		type *restrict d = dst;					\
+		const type *restrict s = src;				\
+		type *restrict r = res;					\
 		for (i = 0; i < cnt; i++) {				\
 			r[i] = d[i];					\
 			op(type, d[i], s[i]);				\
@@ -578,9 +578,9 @@ size_t ofi_datatype_size(enum fi_datatype datatype)
 		(void *dst, const void *src, void *res, size_t cnt)	\
 	{								\
 		size_t i;						\
-		ofi_complex_##type *d = dst;				\
-		const ofi_complex_##type *s = src;			\
-		ofi_complex_##type *r = res;				\
+		ofi_complex_##type *restrict d = dst;			\
+		const ofi_complex_##type *restrict s = src;		\
+		ofi_complex_##type *restrict r = res;			\
 		for (i = 0; i < cnt; i++) {				\
 			r[i] = d[i];					\
 			op(type, d[i], s[i]);				\
@@ -741,10 +741,10 @@ size_t ofi_datatype_size(enum fi_datatype datatype)
 		 void *res, size_t cnt)					\
 	{								\
 		size_t i;						\
-		type *d = dst;						\
-		const type *s = src;					\
-		const type *c = cmp;					\
-		type *r = (res);					\
+		type *restrict d = dst;					\
+		const type *restrict s = src;				\
+		const type *restrict c = cmp;				\
+		type *restrict r = (res);				\
 		for (i = 0; i < cnt; i++) {				\
 			r[i] = d[i];					\
 			op(type, d[i], s[i], c[i]);			\
@@ -758,10 +758,10 @@ size_t ofi_datatype_size(enum fi_datatype datatype)
 		 void *res, size_t cnt)					\
 	{								\
 		size_t i;						\
-		ofi_complex_##type *d = dst;				\
-		const ofi_complex_##type *s = src;			\
-		const ofi_complex_##type *c = cmp;			\
-		ofi_complex_##type *r = res;				\
+		ofi_complex_##type *restrict d = dst;			\
+		const ofi_complex_##type *restrict s = src;		\
+		const ofi_complex_##type *restrict c = cmp;		\
+		ofi_complex_##type *restrict r = res;			\
 		for (i = 0; i < cnt; i++) {				\
 			r[i] = d[i];					\
 			op(type, d[i], s[i], c[i]);			\
