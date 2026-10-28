@@ -70,6 +70,16 @@ typedef __int128 ofi_int128_t;
 typedef unsigned __int128 ofi_uint128_t;
 #endif
 
+struct ofi_atomic_handlers {
+	void (*write[OFI_WRITE_OP_CNT][OFI_DATATYPE_CNT])
+		(void *dst, const void *src, size_t cnt);
+	void (*readwrite[OFI_READWRITE_OP_CNT][OFI_DATATYPE_CNT])
+		(void *dst, const void *src, void *res, size_t cnt);
+	void (*swap[OFI_SWAP_OP_CNT][OFI_DATATYPE_CNT])
+		(void *dst, const void *src, const void *cmp,
+		 void *res, size_t cnt);
+};
+
 extern void (*ofi_atomic_write_handlers[OFI_WRITE_OP_CNT][OFI_DATATYPE_CNT])
 			(void *dst, const void *src, size_t cnt);
 extern void (*ofi_atomic_readwrite_handlers[OFI_READWRITE_OP_CNT][OFI_DATATYPE_CNT])
@@ -86,8 +96,13 @@ extern void (*ofi_atomic_swap_handlers[OFI_SWAP_OP_CNT][OFI_DATATYPE_CNT])
 	ofi_atomic_swap_handlers[op - OFI_SWAP_OP_START][datatype](dst, src, \
 								cmp, res, cnt)
 
+const struct ofi_atomic_handlers *ofi_atomic_get_handlers(bool mm_atomics);
 int ofi_atomic_valid(const struct fi_provider *prov,
 		     enum fi_datatype datatype, enum fi_op op, uint64_t flags);
+int ofi_atomic_valid_handlers(const struct fi_provider *prov,
+			      const struct ofi_atomic_handlers *handlers,
+			      enum fi_datatype datatype, enum fi_op op,
+			      uint64_t flags);
 
 
 #ifdef __cplusplus

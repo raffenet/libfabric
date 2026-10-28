@@ -116,40 +116,6 @@ size_t ofi_datatype_size(enum fi_datatype datatype)
 
 #define OFI_OP_READWRITE_COMPLEX	OFI_OP_READWRITE
 
-#else /* HAVE_BUILTIN_MM_ATOMICS */
-
-#define OFI_OP_MIN(type,dst,src)   if ((dst) > (src)) (dst) = (src)
-#define OFI_OP_MAX(type,dst,src)   if ((dst) < (src)) (dst) = (src)
-#define OFI_OP_SUM(type,dst,src)   (dst) += (src)
-#define OFI_OP_PROD(type,dst,src)  (dst) *= (src)
-#define OFI_OP_LOR(type,dst,src)   (dst) = (dst) || (src)
-#define OFI_OP_LAND(type,dst,src)  (dst) = (dst) && (src)
-#define OFI_OP_BOR(type,dst,src)   (dst) |= (src)
-#define OFI_OP_BAND(type,dst,src)  (dst) &= (src)
-#define OFI_OP_LXOR(type,dst,src)  (dst) = ((dst) && !(src)) || (!(dst) && (src))
-#define OFI_OP_BXOR(type,dst,src)  (dst) ^= (src)
-#define OFI_OP_READ(type,dst,src)  (dst)
-#define OFI_OP_WRITE(type,dst,src) (dst) = (src)
-
-#define OFI_OP_CSWAP_EQ(type,dst,src,cmp) if ((cmp) == (dst)) (dst) = (src)
-#define OFI_OP_CSWAP_NE(type,dst,src,cmp) if ((cmp) != (dst)) (dst) = (src)
-#define OFI_OP_CSWAP_LE(type,dst,src,cmp) if ((cmp) <= (dst)) (dst) = (src)
-#define OFI_OP_CSWAP_LT(type,dst,src,cmp) if ((cmp) <  (dst)) (dst) = (src)
-#define OFI_OP_CSWAP_GE(type,dst,src,cmp) if ((cmp) >= (dst)) (dst) = (src)
-#define OFI_OP_CSWAP_GT(type,dst,src,cmp) if ((cmp) >  (dst)) (dst) = (src)
-#define OFI_OP_MSWAP(type,dst,src,cmp)    (dst) = (((src) & (cmp)) | \
-						   ((dst) & ~(cmp)))
-
-/* Need special handlers for complex datatypes for portability */
-#define OFI_OP_SUM_COMPLEX(type,dst,src)  (dst) = ofi_complex_sum_##type(dst,src)
-#define OFI_OP_PROD_COMPLEX(type,dst,src) (dst) = ofi_complex_prod_##type(dst,src)
-#define OFI_OP_LOR_COMPLEX(type,dst,src)  (dst) = ofi_complex_lor_##type(dst,src)
-#define OFI_OP_LAND_COMPLEX(type,dst,src) (dst) = ofi_complex_land_##type(dst,src)
-#define OFI_OP_LXOR_COMPLEX(type,dst,src) (dst) = ofi_complex_lxor_##type(dst,src)
-#define OFI_OP_CSWAP_EQ_COMPLEX(type,dst,src,cmp) \
-			if (ofi_complex_eq_##type(dst,cmp)) (dst) = (src)
-#define OFI_OP_CSWAP_NE_COMPLEX(type,dst,src,cmp) \
-			if (!ofi_complex_eq_##type(dst,cmp)) (dst) = (src)
 #endif /* HAVE_BUILTIN_MM_ATOMICS */
 
 #define OFI_OP_READ_COMPLEX		OFI_OP_READ
@@ -237,8 +203,8 @@ size_t ofi_datatype_size(enum fi_datatype datatype)
 		(void *dst, const void *src, size_t cnt)		\
 	{								\
 		size_t i;						\
-		type *restrict d = (dst);				\
-		const type *restrict s = (src);				\
+		type *d = (dst);					\
+		const type *s = (src);					\
 		type temp_s;						\
 		for (i = 0; i < cnt; i++) {				\
 			temp_s = s[i];					\
@@ -252,8 +218,8 @@ size_t ofi_datatype_size(enum fi_datatype datatype)
 		(void *dst, const void *src, size_t cnt)		\
 	{								\
 		size_t i;						\
-		ofi_complex_##type *restrict d = (dst);			\
-		const ofi_complex_##type *restrict s = (src);		\
+		ofi_complex_##type *d = (dst);				\
+		const ofi_complex_##type *s = (src);			\
 		ofi_complex_##type temp_s;				\
 		for (i = 0; i < cnt; i++) {				\
 			temp_s = s[i];					\
@@ -372,32 +338,6 @@ size_t ofi_datatype_size(enum fi_datatype datatype)
 		OFI_UNUSED(src);					\
 		for (i = 0; i < cnt; i++)				\
 			op(type, d[i], r[i]);				\
-	}
-
-#else /* HAVE_BUILTIN_MM_ATOMICS */
-
-#define OFI_DEF_READ_FUNC(op, type)					\
-	static void ofi_read_## op ##_## type				\
-		(void *dst, const void *src, void *res, size_t cnt)	\
-	{								\
-		size_t i;						\
-		const type *restrict d = (dst);				\
-		type *restrict r = (res);				\
-		OFI_UNUSED(src);					\
-		for (i = 0; i < cnt; i++)				\
-			r[i] = op(type, d[i], r[i]);			\
-	}
-
-#define OFI_DEF_READ_COMPLEX_FUNC(op, type)				\
-	static void ofi_read_## op ##_## type				\
-		(void *dst, const void *src, void *res, size_t cnt)	\
-	{								\
-		size_t i;						\
-		const ofi_complex_##type *restrict d = (dst);		\
-		ofi_complex_##type *restrict r = (res);			\
-		OFI_UNUSED(src);					\
-		for (i = 0; i < cnt; i++)				\
-			r[i] = op(type, d[i], r[i]);			\
 	}
 
 #endif /* HAVE_BUILTIN_MM_ATOMICS */
@@ -555,38 +495,6 @@ size_t ofi_datatype_size(enum fi_datatype datatype)
 		}							\
 	}
 
-#else /* HAVE_BUILTIN_MM_ATOMICS */
-
-#define OFI_DEF_READWRITE_NAME(op, type) ofi_readwrite_## op ##_## type,
-#define OFI_DEF_READWRITE_FUNC(op, type)				\
-	static void ofi_readwrite_## op ##_## type			\
-		(void *dst, const void *src, void *res, size_t cnt)	\
-	{								\
-		size_t i;						\
-		type *restrict d = dst;					\
-		const type *restrict s = src;				\
-		type *restrict r = res;					\
-		for (i = 0; i < cnt; i++) {				\
-			r[i] = d[i];					\
-			op(type, d[i], s[i]);				\
-		}							\
-	}
-
-#define OFI_DEF_READWRITE_COMPLEX_NAME(op, type) ofi_readwrite_## op ##_## type,
-#define OFI_DEF_READWRITE_COMPLEX_FUNC(op, type)			\
-	static void ofi_readwrite_## op ##_## type			\
-		(void *dst, const void *src, void *res, size_t cnt)	\
-	{								\
-		size_t i;						\
-		ofi_complex_##type *restrict d = dst;			\
-		const ofi_complex_##type *restrict s = src;		\
-		ofi_complex_##type *restrict r = res;			\
-		for (i = 0; i < cnt; i++) {				\
-			r[i] = d[i];					\
-			op(type, d[i], s[i]);				\
-		}							\
-	}
-
 #endif /* HAVE_BUILTIN_MM_ATOMICS */
 
 /*
@@ -732,42 +640,6 @@ size_t ofi_datatype_size(enum fi_datatype datatype)
 		}							\
 	}
 
-#else /* HAVE_BUILTIN_MM_ATOMICS */
-
-#define OFI_DEF_CSWAP_NAME(op, type) ofi_cswap_## op ##_## type,
-#define OFI_DEF_CSWAP_FUNC(op, type)					\
-	static void ofi_cswap_## op ##_## type				\
-		(void *dst, const void *src, const void *cmp,		\
-		 void *res, size_t cnt)					\
-	{								\
-		size_t i;						\
-		type *restrict d = dst;					\
-		const type *restrict s = src;				\
-		const type *restrict c = cmp;				\
-		type *restrict r = (res);				\
-		for (i = 0; i < cnt; i++) {				\
-			r[i] = d[i];					\
-			op(type, d[i], s[i], c[i]);			\
-		}							\
-	}
-
-#define OFI_DEF_CSWAP_COMPLEX_NAME(op, type) ofi_cswap_## op ##_## type,
-#define OFI_DEF_CSWAP_COMPLEX_FUNC(op, type)				\
-	static void ofi_cswap_## op ##_## type				\
-		(void *dst, const void *src, const void *cmp,		\
-		 void *res, size_t cnt)					\
-	{								\
-		size_t i;						\
-		ofi_complex_##type *restrict d = dst;			\
-		const ofi_complex_##type *restrict s = src;		\
-		const ofi_complex_##type *restrict c = cmp;		\
-		ofi_complex_##type *restrict r = res;			\
-		for (i = 0; i < cnt; i++) {				\
-			r[i] = d[i];					\
-			op(type, d[i], s[i], c[i]);			\
-		}							\
-	}
-
 #endif /* HAVE_BUILTIN_MM_ATOMICS */
 
 /*********************************************************************
@@ -835,44 +707,6 @@ size_t ofi_datatype_size(enum fi_datatype datatype)
 	OFI_DEF_NOOP_##FUNCNAME						\
 	OFI_DEF_NOOP_##FUNCNAME						\
 	OFI_DEF_NOOP_##FUNCNAME						\
-	OFI_DEF_NOOP_##FUNCNAME						\
-	OFI_DEF_##ATOMICTYPE##_INT128_##FUNCNAME(op, ofi_int128_t)	\
-	OFI_DEF_##ATOMICTYPE##_INT128_##FUNCNAME(op, ofi_uint128_t)
-
-#else /* HAVE_BUILTIN_MM_ATOMICS */
-
-#define OFI_DEFINE_ALL_HANDLERS(ATOMICTYPE, FUNCNAME, op)		\
-	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, int8_t)			\
-	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, uint8_t)			\
-	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, int16_t)			\
-	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, uint16_t)			\
-	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, int32_t)			\
-	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, uint32_t)			\
-	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, int64_t)			\
-	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, uint64_t)			\
-	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, float)			\
-	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, double)			\
-	OFI_DEF_##ATOMICTYPE##_COMPLEX_##FUNCNAME(op ##_COMPLEX, float)	\
-	OFI_DEF_##ATOMICTYPE##_COMPLEX_##FUNCNAME(op ##_COMPLEX, double)\
-	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, long_double)		\
-	OFI_DEF_##ATOMICTYPE##_COMPLEX_##FUNCNAME(op ##_COMPLEX, long_double) \
-	OFI_DEF_##ATOMICTYPE##_INT128_##FUNCNAME(op, ofi_int128_t)	\
-	OFI_DEF_##ATOMICTYPE##_INT128_##FUNCNAME(op, ofi_uint128_t)
-
-#define OFI_DEFINE_REALNO_HANDLERS(ATOMICTYPE, FUNCNAME, op)		\
-	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, int8_t)			\
-	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, uint8_t)			\
-	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, int16_t)			\
-	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, uint16_t)			\
-	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, int32_t)			\
-	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, uint32_t)			\
-	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, int64_t)			\
-	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, uint64_t)			\
-	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, float)			\
-	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, double)			\
-	OFI_DEF_NOOP_##FUNCNAME						\
-	OFI_DEF_NOOP_##FUNCNAME						\
-	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, long_double)		\
 	OFI_DEF_NOOP_##FUNCNAME						\
 	OFI_DEF_##ATOMICTYPE##_INT128_##FUNCNAME(op, ofi_int128_t)	\
 	OFI_DEF_##ATOMICTYPE##_INT128_##FUNCNAME(op, ofi_uint128_t)
@@ -979,12 +813,318 @@ void (*ofi_atomic_swap_handlers[OFI_SWAP_OP_CNT][OFI_DATATYPE_CNT])
 	{ OFI_DEFINE_INT_HANDLERS(CSWAPEXT, NAME, OFI_OP_MSWAP) },
 };
 
-static void ofi_log_atomic_info(const struct fi_provider *prov)
+static const struct ofi_atomic_handlers ofi_atomic_mm_handlers = {
+	.write = {
+		{ OFI_DEFINE_REALNO_HANDLERS(WRITEEXT_CMP, NAME, OFI_OP_MIN) },
+		{ OFI_DEFINE_REALNO_HANDLERS(WRITEEXT_CMP, NAME, OFI_OP_MAX) },
+		{ OFI_DEFINE_ALL_HANDLERS(WRITEEXT, NAME, OFI_OP_SUM) },
+		{ OFI_DEFINE_ALL_HANDLERS(WRITEEXT, NAME, OFI_OP_PROD) },
+		{ OFI_DEFINE_ALL_HANDLERS(WRITEEXT, NAME, OFI_OP_LOR) },
+		{ OFI_DEFINE_ALL_HANDLERS(WRITEEXT, NAME, OFI_OP_LAND) },
+		{ OFI_DEFINE_INT_HANDLERS(WRITE, NAME, OFI_OP_BOR) },
+		{ OFI_DEFINE_INT_HANDLERS(WRITE, NAME, OFI_OP_BAND) },
+		{ OFI_DEFINE_ALL_HANDLERS(WRITEEXT, NAME, OFI_OP_LXOR) },
+		{ OFI_DEFINE_INT_HANDLERS(WRITE, NAME, OFI_OP_BXOR) },
+		{ OFI_OP_NOT_SUPPORTED(FI_ATOMIC_READ) },
+		{ OFI_DEFINE_ALL_HANDLERS(WRITE, NAME, OFI_OP_WRITE) },
+	},
+	.readwrite = {
+		{ OFI_DEFINE_REALNO_HANDLERS(READWRITEEXT_CMP, NAME, OFI_OP_MIN) },
+		{ OFI_DEFINE_REALNO_HANDLERS(READWRITEEXT_CMP, NAME, OFI_OP_MAX) },
+		{ OFI_DEFINE_ALL_HANDLERS(READWRITEEXT, NAME, OFI_OP_SUM) },
+		{ OFI_DEFINE_ALL_HANDLERS(READWRITEEXT, NAME, OFI_OP_PROD) },
+		{ OFI_DEFINE_ALL_HANDLERS(READWRITEEXT, NAME, OFI_OP_LOR) },
+		{ OFI_DEFINE_ALL_HANDLERS(READWRITEEXT, NAME, OFI_OP_LAND) },
+		{ OFI_DEFINE_INT_HANDLERS(READWRITE, NAME, OFI_OP_BOR) },
+		{ OFI_DEFINE_INT_HANDLERS(READWRITE, NAME, OFI_OP_BAND) },
+		{ OFI_DEFINE_ALL_HANDLERS(READWRITEEXT, NAME, OFI_OP_LXOR) },
+		{ OFI_DEFINE_INT_HANDLERS(READWRITE, NAME, OFI_OP_BXOR) },
+		{ OFI_DEFINE_ALL_HANDLERS(READ, NAME, OFI_OP_READ) },
+		{ OFI_DEFINE_ALL_HANDLERS(EXCHANGE, NAME, OFI_OP_READWRITE) },
+	},
+	.swap = {
+		{ OFI_DEFINE_ALL_HANDLERS(CSWAP, NAME, OFI_OP_CSWAP_EQ) },
+		{ OFI_DEFINE_ALL_HANDLERS(CSWAPEXT_CMP, NAME, OFI_OP_CSWAP_NE) },
+		{ OFI_DEFINE_REALNO_HANDLERS(CSWAPEXT_CMP, NAME, OFI_OP_CSWAP_LE) },
+		{ OFI_DEFINE_REALNO_HANDLERS(CSWAPEXT_CMP, NAME, OFI_OP_CSWAP_LT) },
+		{ OFI_DEFINE_REALNO_HANDLERS(CSWAPEXT_CMP, NAME, OFI_OP_CSWAP_GE) },
+		{ OFI_DEFINE_REALNO_HANDLERS(CSWAPEXT_CMP, NAME, OFI_OP_CSWAP_GT) },
+		{ OFI_DEFINE_INT_HANDLERS(CSWAPEXT, NAME, OFI_OP_MSWAP) },
+	},
+};
+
+static void ofi_log_atomic_mm_info(const struct fi_provider *prov)
 {
 	FI_INFO(prov, FI_LOG_DOMAIN, "Using built-in memory model atomics.\n");
 }
 
-#else /* HAVE_BUILTIN_MM_ATOMICS */
+#endif /* HAVE_BUILTIN_MM_ATOMICS */
+
+/*
+ * Open-coded atomic operations and dispatch tables
+ */
+#undef OFI_OP_MIN
+#undef OFI_OP_MAX
+#undef OFI_OP_SUM
+#undef OFI_OP_PROD
+#undef OFI_OP_LOR
+#undef OFI_OP_LAND
+#undef OFI_OP_BOR
+#undef OFI_OP_BAND
+#undef OFI_OP_LXOR
+#undef OFI_OP_BXOR
+#undef OFI_OP_READ
+#undef OFI_OP_WRITE
+#undef OFI_OP_CSWAP_EQ
+#undef OFI_OP_CSWAP_NE
+#undef OFI_OP_CSWAP_LE
+#undef OFI_OP_CSWAP_LT
+#undef OFI_OP_CSWAP_GE
+#undef OFI_OP_CSWAP_GT
+#undef OFI_OP_MSWAP
+#undef OFI_OP_SUM_COMPLEX
+#undef OFI_OP_PROD_COMPLEX
+#undef OFI_OP_LOR_COMPLEX
+#undef OFI_OP_LAND_COMPLEX
+#undef OFI_OP_LXOR_COMPLEX
+#undef OFI_OP_CSWAP_EQ_COMPLEX
+#undef OFI_OP_CSWAP_NE_COMPLEX
+#undef OFI_OP_READ_COMPLEX
+#undef OFI_OP_WRITE_COMPLEX
+#undef OFI_DEF_WRITE_INT128_NAME
+#undef OFI_DEF_WRITE_INT128_FUNC
+#undef OFI_DEF_READ_INT128_NAME
+#undef OFI_DEF_READ_INT128_FUNC
+#undef OFI_DEF_READWRITE_INT128_NAME
+#undef OFI_DEF_READWRITE_INT128_FUNC
+#undef OFI_DEF_CSWAP_INT128_NAME
+#undef OFI_DEF_CSWAP_INT128_FUNC
+#undef OFI_DEF_WRITE_NAME
+#undef OFI_DEF_WRITE_FUNC
+#undef OFI_DEF_WRITE_COMPLEX_NAME
+#undef OFI_DEF_WRITE_COMPLEX_FUNC
+#undef OFI_DEF_READ_NAME
+#undef OFI_DEF_READ_COMPLEX_NAME
+#undef OFI_DEF_READ_FUNC
+#undef OFI_DEF_READ_COMPLEX_FUNC
+#undef OFI_DEF_READWRITE_NAME
+#undef OFI_DEF_READWRITE_FUNC
+#undef OFI_DEF_READWRITE_COMPLEX_NAME
+#undef OFI_DEF_READWRITE_COMPLEX_FUNC
+#undef OFI_DEF_CSWAP_NAME
+#undef OFI_DEF_CSWAP_FUNC
+#undef OFI_DEF_CSWAP_COMPLEX_NAME
+#undef OFI_DEF_CSWAP_COMPLEX_FUNC
+#undef OFI_DEFINE_ALL_HANDLERS
+#undef OFI_DEFINE_REALNO_HANDLERS
+
+#define OFI_OP_MIN(type,dst,src)   if ((dst) > (src)) (dst) = (src)
+#define OFI_OP_MAX(type,dst,src)   if ((dst) < (src)) (dst) = (src)
+#define OFI_OP_SUM(type,dst,src)   (dst) += (src)
+#define OFI_OP_PROD(type,dst,src)  (dst) *= (src)
+#define OFI_OP_LOR(type,dst,src)   (dst) = (dst) || (src)
+#define OFI_OP_LAND(type,dst,src)  (dst) = (dst) && (src)
+#define OFI_OP_BOR(type,dst,src)   (dst) |= (src)
+#define OFI_OP_BAND(type,dst,src)  (dst) &= (src)
+#define OFI_OP_LXOR(type,dst,src)  (dst) = ((dst) && !(src)) || (!(dst) && (src))
+#define OFI_OP_BXOR(type,dst,src)  (dst) ^= (src)
+#define OFI_OP_READ(type,dst,src)  (dst)
+#define OFI_OP_WRITE(type,dst,src) (dst) = (src)
+
+#define OFI_OP_CSWAP_EQ(type,dst,src,cmp) if ((cmp) == (dst)) (dst) = (src)
+#define OFI_OP_CSWAP_NE(type,dst,src,cmp) if ((cmp) != (dst)) (dst) = (src)
+#define OFI_OP_CSWAP_LE(type,dst,src,cmp) if ((cmp) <= (dst)) (dst) = (src)
+#define OFI_OP_CSWAP_LT(type,dst,src,cmp) if ((cmp) <  (dst)) (dst) = (src)
+#define OFI_OP_CSWAP_GE(type,dst,src,cmp) if ((cmp) >= (dst)) (dst) = (src)
+#define OFI_OP_CSWAP_GT(type,dst,src,cmp) if ((cmp) >  (dst)) (dst) = (src)
+#define OFI_OP_MSWAP(type,dst,src,cmp)    (dst) = (((src) & (cmp)) | \
+						   ((dst) & ~(cmp)))
+
+#define OFI_OP_SUM_COMPLEX(type,dst,src)  (dst) = ofi_complex_sum_##type(dst,src)
+#define OFI_OP_PROD_COMPLEX(type,dst,src) (dst) = ofi_complex_prod_##type(dst,src)
+#define OFI_OP_LOR_COMPLEX(type,dst,src)  (dst) = ofi_complex_lor_##type(dst,src)
+#define OFI_OP_LAND_COMPLEX(type,dst,src) (dst) = ofi_complex_land_##type(dst,src)
+#define OFI_OP_LXOR_COMPLEX(type,dst,src) (dst) = ofi_complex_lxor_##type(dst,src)
+#define OFI_OP_CSWAP_EQ_COMPLEX(type,dst,src,cmp) \
+			if (ofi_complex_eq_##type(dst,cmp)) (dst) = (src)
+#define OFI_OP_CSWAP_NE_COMPLEX(type,dst,src,cmp) \
+			if (!ofi_complex_eq_##type(dst,cmp)) (dst) = (src)
+
+#define OFI_OP_READ_COMPLEX		OFI_OP_READ
+#define OFI_OP_WRITE_COMPLEX		OFI_OP_WRITE
+
+#ifdef HAVE___INT128
+#define OFI_DEF_WRITE_INT128_NAME(op, type)	OFI_DEF_WRITE_NAME(op, type)
+#define OFI_DEF_WRITE_INT128_FUNC(op, type)	OFI_DEF_WRITE_FUNC(op, type)
+#define OFI_DEF_READ_INT128_NAME(op, type)	OFI_DEF_READ_NAME(op, type)
+#define OFI_DEF_READ_INT128_FUNC(op, type)	OFI_DEF_READ_FUNC(op, type)
+#define OFI_DEF_READWRITE_INT128_NAME(op, type)	OFI_DEF_READWRITE_NAME(op, type)
+#define OFI_DEF_READWRITE_INT128_FUNC(op, type)	OFI_DEF_READWRITE_FUNC(op, type)
+#define OFI_DEF_CSWAP_INT128_NAME(op, type)	OFI_DEF_CSWAP_NAME(op, type)
+#define OFI_DEF_CSWAP_INT128_FUNC(op, type)	OFI_DEF_CSWAP_FUNC(op, type)
+#else
+#define OFI_DEF_WRITE_INT128_NAME(op, type)	NULL,
+#define OFI_DEF_WRITE_INT128_FUNC(op, type)
+#define OFI_DEF_READ_INT128_NAME(op, type)	NULL,
+#define OFI_DEF_READ_INT128_FUNC(op, type)
+#define OFI_DEF_READWRITE_INT128_NAME(op, type)	NULL,
+#define OFI_DEF_READWRITE_INT128_FUNC(op, type)
+#define OFI_DEF_CSWAP_INT128_NAME(op, type)	NULL,
+#define OFI_DEF_CSWAP_INT128_FUNC(op, type)
+#endif
+
+#define OFI_DEF_WRITE_NAME(op, type) ofi_write_c_## op ##_## type,
+#define OFI_DEF_WRITE_FUNC(op, type)					\
+	static void ofi_write_c_## op ##_## type			\
+		(void *dst, const void *src, size_t cnt)		\
+	{								\
+		size_t i;						\
+		type *restrict d = (dst);				\
+		const type *restrict s = (src);				\
+		for (i = 0; i < cnt; i++) {				\
+			op(type, d[i], s[i]);				\
+		}							\
+	}
+
+#define OFI_DEF_WRITE_COMPLEX_NAME(op, type) ofi_write_c_## op ##_## type,
+#define OFI_DEF_WRITE_COMPLEX_FUNC(op, type)				\
+	static void ofi_write_c_## op ##_## type			\
+		(void *dst, const void *src, size_t cnt)		\
+	{								\
+		size_t i;						\
+		ofi_complex_##type *restrict d = (dst);			\
+		const ofi_complex_##type *restrict s = (src);		\
+		for (i = 0; i < cnt; i++) {				\
+			op(type, d[i], s[i]);				\
+		}							\
+	}
+
+#define OFI_DEF_READ_NAME(op, type) ofi_read_c_## op ##_## type,
+#define OFI_DEF_READ_COMPLEX_NAME(op, type) ofi_read_c_## op ##_## type,
+
+#define OFI_DEF_READ_FUNC(op, type)					\
+	static void ofi_read_c_## op ##_## type				\
+		(void *dst, const void *src, void *res, size_t cnt)	\
+	{								\
+		size_t i;						\
+		const type *restrict d = (dst);				\
+		type *restrict r = (res);				\
+		OFI_UNUSED(src);					\
+		for (i = 0; i < cnt; i++)				\
+			r[i] = op(type, d[i], r[i]);			\
+	}
+
+#define OFI_DEF_READ_COMPLEX_FUNC(op, type)				\
+	static void ofi_read_c_## op ##_## type				\
+		(void *dst, const void *src, void *res, size_t cnt)	\
+	{								\
+		size_t i;						\
+		const ofi_complex_##type *restrict d = (dst);		\
+		ofi_complex_##type *restrict r = (res);			\
+		OFI_UNUSED(src);					\
+		for (i = 0; i < cnt; i++)				\
+			r[i] = op(type, d[i], r[i]);			\
+	}
+
+#define OFI_DEF_READWRITE_NAME(op, type) ofi_readwrite_c_## op ##_## type,
+#define OFI_DEF_READWRITE_FUNC(op, type)				\
+	static void ofi_readwrite_c_## op ##_## type			\
+		(void *dst, const void *src, void *res, size_t cnt)	\
+	{								\
+		size_t i;						\
+		type *restrict d = dst;					\
+		const type *restrict s = src;				\
+		type *restrict r = res;					\
+		for (i = 0; i < cnt; i++) {				\
+			r[i] = d[i];					\
+			op(type, d[i], s[i]);				\
+		}							\
+	}
+
+#define OFI_DEF_READWRITE_COMPLEX_NAME(op, type) ofi_readwrite_c_## op ##_## type,
+#define OFI_DEF_READWRITE_COMPLEX_FUNC(op, type)			\
+	static void ofi_readwrite_c_## op ##_## type			\
+		(void *dst, const void *src, void *res, size_t cnt)	\
+	{								\
+		size_t i;						\
+		ofi_complex_##type *restrict d = dst;			\
+		const ofi_complex_##type *restrict s = src;		\
+		ofi_complex_##type *restrict r = res;			\
+		for (i = 0; i < cnt; i++) {				\
+			r[i] = d[i];					\
+			op(type, d[i], s[i]);				\
+		}							\
+	}
+
+#define OFI_DEF_CSWAP_NAME(op, type) ofi_cswap_c_## op ##_## type,
+#define OFI_DEF_CSWAP_FUNC(op, type)					\
+	static void ofi_cswap_c_## op ##_## type			\
+		(void *dst, const void *src, const void *cmp,		\
+		 void *res, size_t cnt)					\
+	{								\
+		size_t i;						\
+		type *restrict d = dst;					\
+		const type *restrict s = src;				\
+		const type *restrict c = cmp;				\
+		type *restrict r = (res);				\
+		for (i = 0; i < cnt; i++) {				\
+			r[i] = d[i];					\
+			op(type, d[i], s[i], c[i]);			\
+		}							\
+	}
+
+#define OFI_DEF_CSWAP_COMPLEX_NAME(op, type) ofi_cswap_c_## op ##_## type,
+#define OFI_DEF_CSWAP_COMPLEX_FUNC(op, type)				\
+	static void ofi_cswap_c_## op ##_## type			\
+		(void *dst, const void *src, const void *cmp,		\
+		 void *res, size_t cnt)					\
+	{								\
+		size_t i;						\
+		ofi_complex_##type *restrict d = dst;			\
+		const ofi_complex_##type *restrict s = src;		\
+		const ofi_complex_##type *restrict c = cmp;		\
+		ofi_complex_##type *restrict r = res;			\
+		for (i = 0; i < cnt; i++) {				\
+			r[i] = d[i];					\
+			op(type, d[i], s[i], c[i]);			\
+		}							\
+	}
+
+#define OFI_DEFINE_ALL_HANDLERS(ATOMICTYPE, FUNCNAME, op)		\
+	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, int8_t)			\
+	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, uint8_t)			\
+	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, int16_t)			\
+	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, uint16_t)			\
+	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, int32_t)			\
+	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, uint32_t)			\
+	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, int64_t)			\
+	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, uint64_t)			\
+	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, float)			\
+	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, double)			\
+	OFI_DEF_##ATOMICTYPE##_COMPLEX_##FUNCNAME(op ##_COMPLEX, float)	\
+	OFI_DEF_##ATOMICTYPE##_COMPLEX_##FUNCNAME(op ##_COMPLEX, double)\
+	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, long_double)		\
+	OFI_DEF_##ATOMICTYPE##_COMPLEX_##FUNCNAME(op ##_COMPLEX, long_double) \
+	OFI_DEF_##ATOMICTYPE##_INT128_##FUNCNAME(op, ofi_int128_t)	\
+	OFI_DEF_##ATOMICTYPE##_INT128_##FUNCNAME(op, ofi_uint128_t)
+
+#define OFI_DEFINE_REALNO_HANDLERS(ATOMICTYPE, FUNCNAME, op)		\
+	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, int8_t)			\
+	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, uint8_t)			\
+	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, int16_t)			\
+	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, uint16_t)			\
+	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, int32_t)			\
+	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, uint32_t)			\
+	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, int64_t)			\
+	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, uint64_t)			\
+	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, float)			\
+	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, double)			\
+	OFI_DEF_NOOP_##FUNCNAME						\
+	OFI_DEF_NOOP_##FUNCNAME						\
+	OFI_DEF_##ATOMICTYPE##_##FUNCNAME(op, long_double)		\
+	OFI_DEF_NOOP_##FUNCNAME						\
+	OFI_DEF_##ATOMICTYPE##_INT128_##FUNCNAME(op, ofi_int128_t)	\
+	OFI_DEF_##ATOMICTYPE##_INT128_##FUNCNAME(op, ofi_uint128_t)
 
 /**********************
  * Write dispatch table
@@ -1001,23 +1141,6 @@ OFI_DEFINE_INT_HANDLERS(WRITE, FUNC, OFI_OP_BAND)
 OFI_DEFINE_ALL_HANDLERS(WRITE, FUNC, OFI_OP_LXOR)
 OFI_DEFINE_INT_HANDLERS(WRITE, FUNC, OFI_OP_BXOR)
 OFI_DEFINE_ALL_HANDLERS(WRITE, FUNC, OFI_OP_WRITE)
-
-void (*ofi_atomic_write_handlers[OFI_WRITE_OP_CNT][OFI_DATATYPE_CNT])
-	(void *dst, const void *src, size_t cnt) =
-{
-	{ OFI_DEFINE_REALNO_HANDLERS(WRITE, NAME, OFI_OP_MIN) },
-	{ OFI_DEFINE_REALNO_HANDLERS(WRITE, NAME, OFI_OP_MAX) },
-	{ OFI_DEFINE_ALL_HANDLERS(WRITE, NAME, OFI_OP_SUM) },
-	{ OFI_DEFINE_ALL_HANDLERS(WRITE, NAME, OFI_OP_PROD) },
-	{ OFI_DEFINE_ALL_HANDLERS(WRITE, NAME, OFI_OP_LOR) },
-	{ OFI_DEFINE_ALL_HANDLERS(WRITE, NAME, OFI_OP_LAND) },
-	{ OFI_DEFINE_INT_HANDLERS(WRITE, NAME, OFI_OP_BOR) },
-	{ OFI_DEFINE_INT_HANDLERS(WRITE, NAME, OFI_OP_BAND) },
-	{ OFI_DEFINE_ALL_HANDLERS(WRITE, NAME, OFI_OP_LXOR) },
-	{ OFI_DEFINE_INT_HANDLERS(WRITE, NAME, OFI_OP_BXOR) },
-	{ OFI_OP_NOT_SUPPORTED(FI_ATOMIC_READ) },
-	{ OFI_DEFINE_ALL_HANDLERS(WRITE, NAME, OFI_OP_WRITE) },
-};
 
 /***************************
  * Read-write dispatch table
@@ -1036,6 +1159,83 @@ OFI_DEFINE_INT_HANDLERS(READWRITE, FUNC, OFI_OP_BXOR)
 OFI_DEFINE_ALL_HANDLERS(READ, FUNC, OFI_OP_READ)
 OFI_DEFINE_ALL_HANDLERS(READWRITE, FUNC, OFI_OP_WRITE)
 
+/*****************************
+ * Compare-swap dispatch table
+ *****************************/
+
+OFI_DEFINE_ALL_HANDLERS(CSWAP, FUNC, OFI_OP_CSWAP_EQ)
+OFI_DEFINE_ALL_HANDLERS(CSWAP, FUNC, OFI_OP_CSWAP_NE)
+OFI_DEFINE_REALNO_HANDLERS(CSWAP, FUNC, OFI_OP_CSWAP_LE)
+OFI_DEFINE_REALNO_HANDLERS(CSWAP, FUNC, OFI_OP_CSWAP_LT)
+OFI_DEFINE_REALNO_HANDLERS(CSWAP, FUNC, OFI_OP_CSWAP_GE)
+OFI_DEFINE_REALNO_HANDLERS(CSWAP, FUNC, OFI_OP_CSWAP_GT)
+OFI_DEFINE_INT_HANDLERS(CSWAP, FUNC, OFI_OP_MSWAP)
+
+static const struct ofi_atomic_handlers ofi_atomic_handlers = {
+	.write = {
+		{ OFI_DEFINE_REALNO_HANDLERS(WRITE, NAME, OFI_OP_MIN) },
+		{ OFI_DEFINE_REALNO_HANDLERS(WRITE, NAME, OFI_OP_MAX) },
+		{ OFI_DEFINE_ALL_HANDLERS(WRITE, NAME, OFI_OP_SUM) },
+		{ OFI_DEFINE_ALL_HANDLERS(WRITE, NAME, OFI_OP_PROD) },
+		{ OFI_DEFINE_ALL_HANDLERS(WRITE, NAME, OFI_OP_LOR) },
+		{ OFI_DEFINE_ALL_HANDLERS(WRITE, NAME, OFI_OP_LAND) },
+		{ OFI_DEFINE_INT_HANDLERS(WRITE, NAME, OFI_OP_BOR) },
+		{ OFI_DEFINE_INT_HANDLERS(WRITE, NAME, OFI_OP_BAND) },
+		{ OFI_DEFINE_ALL_HANDLERS(WRITE, NAME, OFI_OP_LXOR) },
+		{ OFI_DEFINE_INT_HANDLERS(WRITE, NAME, OFI_OP_BXOR) },
+		{ OFI_OP_NOT_SUPPORTED(FI_ATOMIC_READ) },
+		{ OFI_DEFINE_ALL_HANDLERS(WRITE, NAME, OFI_OP_WRITE) },
+	},
+	.readwrite = {
+		{ OFI_DEFINE_REALNO_HANDLERS(READWRITE, NAME, OFI_OP_MIN) },
+		{ OFI_DEFINE_REALNO_HANDLERS(READWRITE, NAME, OFI_OP_MAX) },
+		{ OFI_DEFINE_ALL_HANDLERS(READWRITE, NAME, OFI_OP_SUM) },
+		{ OFI_DEFINE_ALL_HANDLERS(READWRITE, NAME, OFI_OP_PROD) },
+		{ OFI_DEFINE_ALL_HANDLERS(READWRITE, NAME, OFI_OP_LOR) },
+		{ OFI_DEFINE_ALL_HANDLERS(READWRITE, NAME, OFI_OP_LAND) },
+		{ OFI_DEFINE_INT_HANDLERS(READWRITE, NAME, OFI_OP_BOR) },
+		{ OFI_DEFINE_INT_HANDLERS(READWRITE, NAME, OFI_OP_BAND) },
+		{ OFI_DEFINE_ALL_HANDLERS(READWRITE, NAME, OFI_OP_LXOR) },
+		{ OFI_DEFINE_INT_HANDLERS(READWRITE, NAME, OFI_OP_BXOR) },
+		{ OFI_DEFINE_ALL_HANDLERS(READ, NAME, OFI_OP_READ) },
+		{ OFI_DEFINE_ALL_HANDLERS(READWRITE, NAME, OFI_OP_WRITE) },
+	},
+	.swap = {
+		{ OFI_DEFINE_ALL_HANDLERS(CSWAP, NAME, OFI_OP_CSWAP_EQ) },
+		{ OFI_DEFINE_ALL_HANDLERS(CSWAP, NAME, OFI_OP_CSWAP_NE) },
+		{ OFI_DEFINE_REALNO_HANDLERS(CSWAP, NAME, OFI_OP_CSWAP_LE) },
+		{ OFI_DEFINE_REALNO_HANDLERS(CSWAP, NAME, OFI_OP_CSWAP_LT) },
+		{ OFI_DEFINE_REALNO_HANDLERS(CSWAP, NAME, OFI_OP_CSWAP_GE) },
+		{ OFI_DEFINE_REALNO_HANDLERS(CSWAP, NAME, OFI_OP_CSWAP_GT) },
+		{ OFI_DEFINE_INT_HANDLERS(CSWAP, NAME, OFI_OP_MSWAP) },
+	},
+};
+
+static void ofi_log_atomic_info(const struct fi_provider *prov)
+{
+	FI_INFO(prov, FI_LOG_DOMAIN, "Using open-coded atomics. "
+		"Use requires single-threaded access by provider.\n");
+}
+
+#ifndef HAVE_BUILTIN_MM_ATOMICS
+
+void (*ofi_atomic_write_handlers[OFI_WRITE_OP_CNT][OFI_DATATYPE_CNT])
+	(void *dst, const void *src, size_t cnt) =
+{
+	{ OFI_DEFINE_REALNO_HANDLERS(WRITE, NAME, OFI_OP_MIN) },
+	{ OFI_DEFINE_REALNO_HANDLERS(WRITE, NAME, OFI_OP_MAX) },
+	{ OFI_DEFINE_ALL_HANDLERS(WRITE, NAME, OFI_OP_SUM) },
+	{ OFI_DEFINE_ALL_HANDLERS(WRITE, NAME, OFI_OP_PROD) },
+	{ OFI_DEFINE_ALL_HANDLERS(WRITE, NAME, OFI_OP_LOR) },
+	{ OFI_DEFINE_ALL_HANDLERS(WRITE, NAME, OFI_OP_LAND) },
+	{ OFI_DEFINE_INT_HANDLERS(WRITE, NAME, OFI_OP_BOR) },
+	{ OFI_DEFINE_INT_HANDLERS(WRITE, NAME, OFI_OP_BAND) },
+	{ OFI_DEFINE_ALL_HANDLERS(WRITE, NAME, OFI_OP_LXOR) },
+	{ OFI_DEFINE_INT_HANDLERS(WRITE, NAME, OFI_OP_BXOR) },
+	{ OFI_OP_NOT_SUPPORTED(FI_ATOMIC_READ) },
+	{ OFI_DEFINE_ALL_HANDLERS(WRITE, NAME, OFI_OP_WRITE) },
+};
+
 void (*ofi_atomic_readwrite_handlers[OFI_READWRITE_OP_CNT][OFI_DATATYPE_CNT])
 	(void *dst, const void *src, void *res, size_t cnt) =
 {
@@ -1053,18 +1253,6 @@ void (*ofi_atomic_readwrite_handlers[OFI_READWRITE_OP_CNT][OFI_DATATYPE_CNT])
 	{ OFI_DEFINE_ALL_HANDLERS(READWRITE, NAME, OFI_OP_WRITE) },
 };
 
-/*****************************
- * Compare-swap dispatch table
- *****************************/
-
-OFI_DEFINE_ALL_HANDLERS(CSWAP, FUNC, OFI_OP_CSWAP_EQ)
-OFI_DEFINE_ALL_HANDLERS(CSWAP, FUNC, OFI_OP_CSWAP_NE)
-OFI_DEFINE_REALNO_HANDLERS(CSWAP, FUNC, OFI_OP_CSWAP_LE)
-OFI_DEFINE_REALNO_HANDLERS(CSWAP, FUNC, OFI_OP_CSWAP_LT)
-OFI_DEFINE_REALNO_HANDLERS(CSWAP, FUNC, OFI_OP_CSWAP_GE)
-OFI_DEFINE_REALNO_HANDLERS(CSWAP, FUNC, OFI_OP_CSWAP_GT)
-OFI_DEFINE_INT_HANDLERS(CSWAP, FUNC, OFI_OP_MSWAP)
-
 void (*ofi_atomic_swap_handlers[OFI_SWAP_OP_CNT][OFI_DATATYPE_CNT])
 	(void *dst, const void *src, const void *cmp, void *res, size_t cnt) =
 {
@@ -1077,20 +1265,34 @@ void (*ofi_atomic_swap_handlers[OFI_SWAP_OP_CNT][OFI_DATATYPE_CNT])
 	{ OFI_DEFINE_INT_HANDLERS(CSWAP, NAME, OFI_OP_MSWAP) },
 };
 
-static void ofi_log_atomic_info(const struct fi_provider *prov)
+#endif /* !HAVE_BUILTIN_MM_ATOMICS */
+
+const struct ofi_atomic_handlers *ofi_atomic_get_handlers(bool mm_atomics)
 {
-	FI_INFO(prov, FI_LOG_DOMAIN, "Using open-coded atomics. "
-		"Use requires single-threaded access by provider.\n");
+#ifdef HAVE_BUILTIN_MM_ATOMICS
+	if (mm_atomics)
+		return &ofi_atomic_mm_handlers;
+#endif
+	return &ofi_atomic_handlers;
 }
 
-#endif /* HAVE_BUILTIN_MM_ATOMICS */
-
-int ofi_atomic_valid(const struct fi_provider *prov,
-		     enum fi_datatype datatype, enum fi_op op, uint64_t flags)
+int ofi_atomic_valid_handlers(const struct fi_provider *prov,
+			      const struct ofi_atomic_handlers *handlers,
+			      enum fi_datatype datatype, enum fi_op op,
+			      uint64_t flags)
 {
 	int have_func;
 
-	ofi_log_atomic_info(prov);
+	if (!handlers)
+		handlers = ofi_atomic_get_handlers(true);
+
+#ifdef HAVE_BUILTIN_MM_ATOMICS
+	if (handlers == &ofi_atomic_mm_handlers)
+		ofi_log_atomic_mm_info(prov);
+	else
+#endif
+		ofi_log_atomic_info(prov);
+
 	if (flags & FI_TAGGED) {
 		/* Only tagged atomic write operations currently supported */
 		if (flags & (FI_FETCH_ATOMIC | FI_COMPARE_ATOMIC)) {
@@ -1116,19 +1318,19 @@ int ofi_atomic_valid(const struct fi_provider *prov,
 			FI_INFO(prov, FI_LOG_DOMAIN, "Invalid fetch operation\n");
 			return -FI_EOPNOTSUPP;
 		}
-		have_func = ofi_atomic_readwrite_handlers[op][datatype] != NULL;
+		have_func = handlers->readwrite[op][datatype] != NULL;
 	} else if (flags & FI_COMPARE_ATOMIC) {
 		if (!ofi_atomic_isswap_op(op)) {
 			FI_INFO(prov, FI_LOG_DOMAIN, "Invalid swap operation\n");
 			return -FI_EOPNOTSUPP;
 		}
-		have_func = ofi_atomic_swap_handlers[op - FI_CSWAP][datatype] != NULL;
+		have_func = handlers->swap[op - FI_CSWAP][datatype] != NULL;
 	} else {
 		if (!ofi_atomic_iswrite_op(op)) {
 			FI_INFO(prov, FI_LOG_DOMAIN, "Invalid write operation\n");
 			return -FI_EOPNOTSUPP;
 		}
-		have_func = ofi_atomic_write_handlers[op][datatype] != NULL;
+		have_func = handlers->write[op][datatype] != NULL;
 	}
 
 	if (!have_func) {
@@ -1137,4 +1339,10 @@ int ofi_atomic_valid(const struct fi_provider *prov,
 	}
 
 	return 0;
+}
+
+int ofi_atomic_valid(const struct fi_provider *prov,
+		     enum fi_datatype datatype, enum fi_op op, uint64_t flags)
+{
+	return ofi_atomic_valid_handlers(prov, NULL, datatype, op, flags);
 }
