@@ -48,15 +48,18 @@ static void smr_generic_atomic_format(struct smr_cmd *cmd, uint8_t datatype,
 	cmd->hdr.atomic_op = atomic_op;
 }
 
-static inline int smr_atomic_check_supported(enum fi_datatype datatype,
-					      enum fi_op op, uint64_t flags)
+static inline int smr_atomic_check_supported(
+			const struct ofi_atomic_handlers *handlers,
+			enum fi_datatype datatype, enum fi_op op,
+			uint64_t flags)
 {
 	if (datatype == FI_INT128 || datatype == FI_UINT128) {
 		FI_WARN(&smr_prov, FI_LOG_EP_CTRL, "128-bit datatypes not supported\n");
 		return -FI_EOPNOTSUPP;
 	}
 
-	return ofi_atomic_valid(&smr_prov, datatype, op, flags);
+	return ofi_atomic_valid_handlers(&smr_prov, handlers, datatype, op,
+					 flags);
 }
 
 static inline int smr_atomic_get_target_len(const struct fi_rma_ioc *rma_ioc,
@@ -224,6 +227,7 @@ static ssize_t smr_generic_atomic(
 			enum fi_op atomic_op, void *context, uint32_t op,
 			uint64_t op_flags)
 {
+	struct smr_domain *domain;
 	struct smr_cmd *ce, *cmd;
 	struct smr_region *peer_smr;
 	struct iovec iov[SMR_IOV_LIMIT];
@@ -249,7 +253,10 @@ static ssize_t smr_generic_atomic(
 	else
 		atomic_flags = 0;
 
-	ret = smr_atomic_check_supported(datatype, atomic_op, atomic_flags);
+	domain = container_of(ep->util_ep.domain, struct smr_domain,
+			      util_domain);
+	ret = smr_atomic_check_supported(domain->atomic_handlers, datatype,
+					 atomic_op, atomic_flags);
 	if (ret) {
 		FI_WARN(&smr_prov, FI_LOG_EP_CTRL,
 			"atomic operation not supported for datatype %d and "
@@ -426,6 +433,7 @@ static ssize_t smr_atomic_inject(
 			fi_addr_t dest_addr, uint64_t addr, uint64_t key,
 			enum fi_datatype datatype, enum fi_op op)
 {
+	struct smr_domain *domain;
 	struct smr_cmd *ce;
 	struct smr_ep *ep;
 	struct smr_region *peer_smr;
@@ -439,7 +447,10 @@ static ssize_t smr_atomic_inject(
 
 	ep = container_of(ep_fid, struct smr_ep, util_ep.ep_fid.fid);
 
-	ret = smr_atomic_check_supported(datatype, op, 0);
+	domain = container_of(ep->util_ep.domain, struct smr_domain,
+			      util_domain);
+	ret = smr_atomic_check_supported(domain->atomic_handlers, datatype, op,
+					 0);
 	if (ret) {
 		FI_WARN(&smr_prov, FI_LOG_EP_CTRL,
 			"atomic operation not supported for datatype %d and "
@@ -651,6 +662,7 @@ static ssize_t smr_atomic_compwrite(
 int smr_query_atomic(struct fid_domain *domain, enum fi_datatype datatype,
 		     enum fi_op op, struct fi_atomic_attr *attr, uint64_t flags)
 {
+	struct smr_domain *smr_domain = NULL;
 	int ret;
 	size_t total_size;
 
@@ -660,7 +672,12 @@ int smr_query_atomic(struct fid_domain *domain, enum fi_datatype datatype,
 		return -FI_EOPNOTSUPP;
 	}
 
-	ret = smr_atomic_check_supported(datatype, op, flags);
+	if (domain)
+		smr_domain = container_of(domain, struct smr_domain,
+					  util_domain.domain_fid);
+	ret = smr_atomic_check_supported(smr_domain ?
+					 smr_domain->atomic_handlers : NULL,
+					 datatype, op, flags);
 	if (ret || !attr)
 		return ret;
 
@@ -673,13 +690,16 @@ int smr_query_atomic(struct fid_domain *domain, enum fi_datatype datatype,
 	return ret;
 }
 
-static int smr_atomic_valid(struct fid_ep *ep, enum fi_datatype datatype,
+static int smr_atomic_valid(struct fid_ep *ep_fid, enum fi_datatype datatype,
 			    enum fi_op op, size_t *count)
 {
+	struct smr_ep *ep = container_of(ep_fid, struct smr_ep,
+					 util_ep.ep_fid.fid);
 	struct fi_atomic_attr attr;
 	int ret;
 
-	ret = smr_query_atomic(NULL, datatype, op, &attr, 0);
+	ret = smr_query_atomic(&ep->util_ep.domain->domain_fid, datatype, op,
+			       &attr, 0);
 
 	if (!ret)
 		*count = attr.count;
@@ -687,13 +707,17 @@ static int smr_atomic_valid(struct fid_ep *ep, enum fi_datatype datatype,
 	return ret;
 }
 
-static int smr_atomic_fetch_valid(struct fid_ep *ep, enum fi_datatype datatype,
-				  enum fi_op op, size_t *count)
+static int smr_atomic_fetch_valid(struct fid_ep *ep_fid,
+				  enum fi_datatype datatype, enum fi_op op,
+				  size_t *count)
 {
+	struct smr_ep *ep = container_of(ep_fid, struct smr_ep,
+					 util_ep.ep_fid.fid);
 	struct fi_atomic_attr attr;
 	int ret;
 
-	ret = smr_query_atomic(NULL, datatype, op, &attr, FI_FETCH_ATOMIC);
+	ret = smr_query_atomic(&ep->util_ep.domain->domain_fid, datatype, op,
+			       &attr, FI_FETCH_ATOMIC);
 
 	if (!ret)
 		*count = attr.count;
@@ -701,13 +725,17 @@ static int smr_atomic_fetch_valid(struct fid_ep *ep, enum fi_datatype datatype,
 	return ret;
 }
 
-static int smr_atomic_comp_valid(struct fid_ep *ep, enum fi_datatype datatype,
-				 enum fi_op op, size_t *count)
+static int smr_atomic_comp_valid(struct fid_ep *ep_fid,
+				 enum fi_datatype datatype, enum fi_op op,
+				 size_t *count)
 {
+	struct smr_ep *ep = container_of(ep_fid, struct smr_ep,
+					 util_ep.ep_fid.fid);
 	struct fi_atomic_attr attr;
 	int ret;
 
-	ret = smr_query_atomic(NULL, datatype, op, &attr, FI_COMPARE_ATOMIC);
+	ret = smr_query_atomic(&ep->util_ep.domain->domain_fid, datatype, op,
+			       &attr, FI_COMPARE_ATOMIC);
 
 	if (!ret)
 		*count = attr.count;

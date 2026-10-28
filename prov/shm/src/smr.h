@@ -34,6 +34,7 @@
 #define _SMR_H_
 
 #include "smr_util.h"
+#include "ofi_atomic.h"
 #include "ofi_shm_p2p.h"
 #include "ofi_util.h"
 
@@ -207,9 +208,10 @@ struct smr_cmd_ctx {
 };
 
 struct smr_domain {
-	struct util_domain	util_domain;
-	bool			fast_rma;
-	struct ofi_mr_cache	*ipc_cache;
+	struct util_domain		util_domain;
+	bool				fast_rma;
+	const struct ofi_atomic_handlers *atomic_handlers;
+	struct ofi_mr_cache		*ipc_cache;
 };
 
 struct smr_peer_srx {

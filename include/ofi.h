@@ -134,6 +134,12 @@ ofi_poll_del(struct fid_poll *pollset, struct fid *event_fid, uint64_t flags)
 /* internal mode bit carried over from v1 */
 #define OFI_BUFFERED_RECV	(1ULL << 51)
 
+#define FI_PROV_SPECIFIC_SHM	(0x5b3 << 16)
+
+enum {
+	FI_OPT_SHM_MM_ATOMICS = -FI_PROV_SPECIFIC_SHM,	/* bool */
+};
+
 
 #define OFI_ORDER_RAR_SET	(FI_ORDER_RAR | FI_ORDER_RMA_RAR | \
 				 FI_ORDER_ATOMIC_RAR)

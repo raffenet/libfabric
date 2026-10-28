@@ -125,6 +125,7 @@ int smr_ep_setopt(fid_t fid, int level, int optname, const void *optval,
 {
 	struct smr_ep *smr_ep =
 		container_of(fid, struct smr_ep, util_ep.ep_fid);
+	struct smr_domain *domain;
 
 	if (level != FI_OPT_ENDPOINT)
 		return -FI_ENOPROTOOPT;
@@ -145,6 +146,17 @@ int smr_ep_setopt(fid_t fid, int level, int optname, const void *optval,
 
 		/* our CUDA support relies on the ability to call CUDA API */
 		return *(bool *)optval ? FI_SUCCESS : -FI_EOPNOTSUPP;
+	}
+
+	if (optname == FI_OPT_SHM_MM_ATOMICS) {
+		if (!optval || optlen != sizeof(bool))
+			return -FI_EINVAL;
+
+		domain = container_of(smr_ep->util_ep.domain, struct smr_domain,
+				      util_domain);
+		domain->atomic_handlers =
+			ofi_atomic_get_handlers(*(const bool *)optval);
+		return FI_SUCCESS;
 	}
 
 	return -FI_ENOPROTOOPT;

@@ -605,7 +605,8 @@ static smr_progress_func smr_progress_ops[smr_proto_max] = {
 
 static void smr_do_atomic(struct smr_cmd *cmd, void *src, struct ofi_mr *dst_mr,
 			  void *dst, void *cmp, enum fi_datatype datatype,
-			  enum fi_op op, size_t cnt)
+			  enum fi_op op, size_t cnt,
+			  const struct ofi_atomic_handlers *handlers)
 {
 	char tmp_result[SMR_INJECT_SIZE];
 	char tmp_dst[SMR_INJECT_SIZE];
@@ -624,16 +625,18 @@ static void smr_do_atomic(struct smr_cmd *cmd, void *src, struct ofi_mr *dst_mr,
 	}
 
 	if (ofi_atomic_isswap_op(op)) {
-		ofi_atomic_swap_handler(op, datatype, cpy_dst, src, cmp,
-					tmp_result, cnt);
+		handlers->swap[op - OFI_SWAP_OP_START][datatype](cpy_dst, src,
+								 cmp,
+								 tmp_result,
+								 cnt);
 		memcpy(src, tmp_result, cnt * ofi_datatype_size(datatype));
 	} else if (cmd->hdr.op == ofi_op_atomic_fetch &&
 		   ofi_atomic_isreadwrite_op(op)) {
-		ofi_atomic_readwrite_handler(op, datatype, cpy_dst, src,
-					     tmp_result, cnt);
+		handlers->readwrite[op][datatype](cpy_dst, src, tmp_result,
+						  cnt);
 		memcpy(src, tmp_result, cnt * ofi_datatype_size(datatype));
 	} else if (ofi_atomic_iswrite_op(op)) {
-		ofi_atomic_write_handler(op, datatype, cpy_dst, src, cnt);
+		handlers->write[op][datatype](cpy_dst, src, cnt);
 	} else {
 		FI_WARN(&smr_prov, FI_LOG_EP_DATA,
 			"invalid atomic operation\n");
@@ -650,7 +653,8 @@ static void smr_do_atomic(struct smr_cmd *cmd, void *src, struct ofi_mr *dst_mr,
 
 static int smr_progress_inline_atomic(struct smr_cmd *cmd, struct ofi_mr **mr,
 				      struct fi_ioc *ioc, size_t ioc_count,
-				      size_t *len)
+				      size_t *len,
+				      const struct ofi_atomic_handlers *handlers)
 {
 	int i;
 	uint8_t *src = cmd->data.msg;
@@ -660,7 +664,7 @@ static int smr_progress_inline_atomic(struct smr_cmd *cmd, struct ofi_mr **mr,
 	for (i = *len = 0; i < ioc_count && *len < cmd->hdr.size; i++) {
 		smr_do_atomic(cmd, &src[*len], mr[i], ioc[i].addr, NULL,
 			      cmd->hdr.datatype, cmd->hdr.atomic_op,
-			      ioc[i].count);
+			      ioc[i].count, handlers);
 		*len += ioc[i].count * ofi_datatype_size(cmd->hdr.datatype);
 	}
 
@@ -674,7 +678,8 @@ static int smr_progress_inline_atomic(struct smr_cmd *cmd, struct ofi_mr **mr,
 
 static int smr_progress_inject_atomic(struct smr_cmd *cmd, struct ofi_mr **mr,
 				      struct fi_ioc *ioc, size_t ioc_count,
-				      size_t *len, struct smr_ep *ep)
+				      size_t *len, struct smr_ep *ep,
+				      const struct ofi_atomic_handlers *handlers)
 {
 	struct smr_inject_buf *tx_buf;
 	uint8_t *src, *comp;
@@ -701,7 +706,7 @@ static int smr_progress_inject_atomic(struct smr_cmd *cmd, struct ofi_mr **mr,
 	for (i = *len = 0; i < ioc_count && *len < cmd->hdr.size; i++) {
 		smr_do_atomic(cmd, &src[*len], mr[i], ioc[i].addr,
 			      comp ? &comp[*len] : NULL, cmd->hdr.datatype,
-			      cmd->hdr.atomic_op, ioc[i].count);
+			      cmd->hdr.atomic_op, ioc[i].count, handlers);
 		*len += ioc[i].count * ofi_datatype_size(cmd->hdr.datatype);
 	}
 
@@ -1310,11 +1315,13 @@ static int smr_progress_cmd_atomic(struct smr_ep *ep, struct smr_cmd *cmd)
 	switch (cmd->hdr.proto) {
 	case smr_proto_inline:
 		err = smr_progress_inline_atomic(cmd, mr, ioc, ioc_count,
-						 &total_len);
+						 &total_len,
+						 domain->atomic_handlers);
 		break;
 	case smr_proto_inject:
 		err = smr_progress_inject_atomic(cmd, mr, ioc, ioc_count,
-						 &total_len, ep);
+						 &total_len, ep,
+						 domain->atomic_handlers);
 		break;
 	default:
 		FI_WARN(&smr_prov, FI_LOG_EP_CTRL,

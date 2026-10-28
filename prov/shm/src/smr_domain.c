@@ -181,6 +181,7 @@ int smr_domain_open(struct fid_fabric *fabric, struct fi_info *info,
 	ofi_mutex_lock(&smr_domain->util_domain.fabric->lock);
 	smr_domain->fast_rma = smr_fast_rma_enabled(info->domain_attr->mr_mode,
 						    info->tx_attr->msg_order);
+	smr_domain->atomic_handlers = ofi_atomic_get_handlers(true);
 	ofi_mutex_unlock(&smr_domain->util_domain.fabric->lock);
 
 	ret = ofi_ipc_cache_open(&smr_domain->ipc_cache,
